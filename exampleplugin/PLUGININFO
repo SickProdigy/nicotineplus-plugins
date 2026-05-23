@@ -1,0 +1,4 @@
+Name = "Example Plugin"
+Version = "1.0"
+Authors = ["Prodigical"]
+Description = "Minimal plugin used to validate plugin loading in this container."
