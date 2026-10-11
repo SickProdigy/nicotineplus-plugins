@@ -17,7 +17,7 @@ from pynicotine import __version__ as NICOTINE_VERSION
 from pynicotine.events import events
 from pynicotine.pluginsystem import BasePlugin
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 MAX_BODY = 65536
 
 
@@ -155,9 +155,9 @@ class Handler(BaseHTTPRequestHandler):
 
 
 class Plugin(BasePlugin):
-    settings = {"host": "127.0.0.1", "port": 12339, "api_key": "", "download_directory": ""}
+    settings = {"host": "0.0.0.0", "port": 12339, "api_key": "", "download_directory": ""}
     metasettings = {
-        "host": {"description": "Listen address (use a private interface for containers)", "type": "str"},
+        "host": {"description": "Listen address (0.0.0.0 for containers; 127.0.0.1 for local-only access)", "type": "str"},
         "port": {"description": "HTTP API port", "type": "int"},
         "api_key": {"description": "API key (at least 32 characters)", "type": "str"},
         "download_directory": {"description": "Completed download root (empty uses Nicotine download directory)", "type": "str"},

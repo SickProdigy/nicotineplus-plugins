@@ -32,12 +32,15 @@ Configure:
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
-| Listen address | `127.0.0.1` | Local API listener; use a private reachable interface for another container |
+| Listen address | `0.0.0.0` | Accept connections from Arr on the private Docker network; use `127.0.0.1` for local-only access |
 | HTTP API port | `12339` | Port used by clients |
 | API key | Empty | Required, at least 32 characters |
 | Completed download root | Empty | Empty uses Nicotine+'s download directory; choose a shared directory for Arr |
 
 Generate a key locally, for example `python3 -c "import secrets; print(secrets.token_urlsafe(32))"`.
+Existing saved settings are preserved on upgrade. If you installed an earlier
+version, change the saved listen address from `127.0.0.1` to `0.0.0.0` for Docker
+connections; updating the plugin alone does not replace that setting.
 The first enable without a key logs a configuration message and does not start
 the listener. After setting the key or changing settings, disable/re-enable the
 plugin. Changing settings does not hot-reconfigure a running listener.

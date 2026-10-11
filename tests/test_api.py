@@ -150,7 +150,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertTrue(state["server"]["isConnected"])
         self.assertIn("download-batches", state["capabilities"])
-        self.assertEqual(self.request("/api/v1/application/version"), (200, "0.1.0"))
+        self.assertEqual(self.request("/api/v1/application/version"), (200, "0.1.1"))
 
     def test_search_captures_token_when_core_returns_none(self):
         ident = self.search()
