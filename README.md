@@ -25,7 +25,16 @@ A plugin is a Python module that extends the functionality of the main applicati
 
 ## Available Plugins
 
-### 🤖 [Autobuddy](https://gitea.rcs1.top/sickprodigy/nicotineplus-plugins/src/branch/main/autobuddy)
+### [Soulseek HTTP API](api/README.md)
+
+Authenticated searches and download batches through your existing Nicotine+ session.
+Works with SickProdigy's [arr-scripts](https://github.com/SickProdigy/arr-scripts)
+for optional Lidarr, Sonarr and Radarr downloads. Initial supported target:
+Nicotine+ 3.3.11 and Python 3.9+. See the plugin documentation for API settings
+and current validation limits.
+
+
+### 🤖 [Autobuddy](autobuddy)
 
 Automatically manage your buddy list based on channel interactions.
 
@@ -39,7 +48,7 @@ When a user joins a monitored channel and says a trigger phrase, anyone with thi
 
 ---
 
-### 📚 [ExamplePlugin](https://gitea.rcs1.top/sickprodigy/nicotineplus-plugins/src/branch/main/exampleplugin)
+### 📚 [ExamplePlugin](exampleplugin)
 
 A reference implementation demonstrating best practices for Nicotine+ plugin development.
 
