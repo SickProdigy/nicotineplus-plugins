@@ -17,7 +17,7 @@ from pynicotine import __version__ as NICOTINE_VERSION
 from pynicotine.events import events
 from pynicotine.pluginsystem import BasePlugin
 
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 MAX_BODY = 65536
 
 
@@ -256,7 +256,7 @@ class Plugin(BasePlugin):
         if method == "GET" and path == "/api/v1/application":
             return 200, {"client": "nicotine", "nicotineVersion": NICOTINE_VERSION,
                          "server": {"isConnected": self.connected()},
-                         "capabilities": ["search", "download-batches", "batch-destination"]}
+                         "capabilities": ["search", "download-batches", "batch-destination", "batch-clear"]}
         if method == "POST" and path == "/api/v1/searches":
             return self.start_search(data)
         if method == "GET" and path.startswith("/api/v1/searches/"):
@@ -264,6 +264,9 @@ class Plugin(BasePlugin):
             return 200, self.read("searches", ident)
         if method == "POST" and path == "/api/v1/transfers/downloads/batches":
             return self.start_batch(data)
+        if method == "POST" and path.startswith("/api/v1/transfers/downloads/batches/") and path.endswith("/clear"):
+            ident = identifier(path.removeprefix("/api/v1/transfers/downloads/batches/").removesuffix("/clear"))
+            return 200, self.clear_batch(ident)
         if method == "GET" and path.startswith("/api/v1/transfers/downloads/batches/"):
             ident = identifier(path.removeprefix("/api/v1/transfers/downloads/batches/"))
             return 200, self.batch_status(ident)
@@ -394,8 +397,35 @@ class Plugin(BasePlugin):
             self.store("batches", ident, value)
         return 201, {"batch": self.batch_status(ident)}
 
+    def clear_batch(self, ident):
+        """Clear terminal rows for this batch only; never delete files."""
+        value = self.read("batches", ident)
+        if value.get("cleared"):
+            return {"id": ident, "cleared": True}
+        folder = destination(self.root, value["destination"])
+        owned = []
+        terminal = {"Finished", "Cancelled", "Filtered", "Download folder error", "Local file error", "Paused"}
+        for file in value["transfers"]:
+            transfer = self.core.downloads.transfers.get(value["username"]+file["filename"])
+            if transfer is None:
+                continue
+            if Path(transfer.folder_path).resolve() != folder or transfer.size != file["size"]:
+                raise ApiFailure(409, "Transfer belongs to another download")
+            if transfer.status not in terminal:
+                raise ApiFailure(409, "Batch still has active or queued transfers")
+            owned.append(transfer)
+        # Validate the entire batch before any mutation; empty list means none,
+        # never call clear_downloads() without an explicit owned list.
+        if owned:
+            self.core.downloads.clear_downloads(owned)
+        value["cleared"] = True
+        self.store("batches", ident, value)
+        return {"id": ident, "cleared": True}
+
     def batch_status(self, ident):
         value = self.read("batches", ident)
+        if value.get("cleared"):
+            return value
         folder = destination(self.root, value["destination"])
         for file in value["transfers"]:
             if file["state"] == "Completed, Rejected":

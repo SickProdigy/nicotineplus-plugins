@@ -150,7 +150,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertTrue(state["server"]["isConnected"])
         self.assertIn("download-batches", state["capabilities"])
-        self.assertEqual(self.request("/api/v1/application/version"), (200, "0.1.1"))
+        self.assertEqual(self.request("/api/v1/application/version"), (200, "0.1.2"))
 
     def test_search_captures_token_when_core_returns_none(self):
         ident = self.search()
@@ -193,6 +193,38 @@ class ApiTests(unittest.TestCase):
         data["files"][0]["size"] = 999
         self.assertEqual(self.request("/api/v1/transfers/downloads/batches", data)[0], 400)
         self.assertFalse(self.core.enqueued)
+
+    def test_clear_batch_refuses_active_and_conflicting_transfers(self):
+        ident,data = self.batch()
+        self.request("/api/v1/transfers/downloads/batches",data)
+        key = "peer"+data["files"][0]["filename"]
+        transfer = self.core.downloads.transfers[key]
+        self.core.downloads.clear_downloads = lambda rows: self.fail("must not clear")
+        self.assertEqual(self.request("/api/v1/transfers/downloads/batches/"+ident+"/clear",{})[0],409)
+        transfer.status = "Finished"
+        transfer.folder_path = str(self.root/"personal")
+        self.assertEqual(self.request("/api/v1/transfers/downloads/batches/"+ident+"/clear",{})[0],409)
+        self.assertIs(self.core.downloads.transfers[key],transfer)
+
+    def test_clear_batch_is_scoped_idempotent_and_retains_files(self):
+        ident,data = self.batch()
+        self.request("/api/v1/transfers/downloads/batches",data)
+        key = "peer"+data["files"][0]["filename"]
+        transfer = self.core.downloads.transfers[key]
+        transfer.status = "Finished"
+        file = Path(transfer.folder_path)/"01 Song.flac"
+        file.write_bytes(b"test")
+        personal = SimpleNamespace(status="Transferring")
+        self.core.downloads.transfers["personal"] = personal
+        def clear(rows):
+            self.assertEqual(rows,[transfer])
+            self.core.downloads.transfers.pop(key)
+        self.core.downloads.clear_downloads = clear
+        path = "/api/v1/transfers/downloads/batches/"+ident+"/clear"
+        self.assertEqual(self.request(path,{})[0],200)
+        self.assertEqual(self.request(path,{})[0],200)
+        self.assertTrue(file.exists())
+        self.assertIs(self.core.downloads.transfers["personal"],personal)
 
     def test_destination_traversal_cannot_escape_root(self):
         for value in ("../escape", "/absolute", "C:\\escape", "..\\escape", "safe/../../escape"):

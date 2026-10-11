@@ -140,3 +140,16 @@ This is a small automation API, not a replacement for the entire slskd API.
 It has no chat, upload management, arbitrary filesystem operations or shell
 execution endpoints. API state is retained locally; the journal may need periodic
 archiving as a large library grows.
+
+
+## Clearing an automation batch (API 0.1.2+)
+
+`POST /api/v1/transfers/downloads/batches/<UUID>/clear` clears only the
+terminal Nicotine download rows owned by that batch. It checks every row's
+peer/file identity, size, and destination before changing anything. Queued or
+active transfers and transfers belonging to another destination return HTTP
+409 without clearing any rows. Repeating a successful request is safe.
+
+The endpoint never deletes files or cancels active downloads. Arr-scripts uses
+it before deleting owned completed/failed files and trying another candidate.
+Update the API plugin files and disable/re-enable the plugin to activate it.

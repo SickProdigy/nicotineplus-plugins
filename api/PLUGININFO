@@ -1,4 +1,4 @@
 Name = "Soulseek HTTP API"
-Version = "0.1.1"
+Version = "0.1.2"
 Authors = ["SickProdigy"]
 Description = "Authenticated search and download API for Nicotine+, including arr-scripts integration. Requires Nicotine+ 3.3.11 or newer and Python 3.9+. Configure an API key in plugin settings before enabling."
