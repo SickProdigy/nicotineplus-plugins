@@ -98,7 +98,19 @@ def main():
             transfer.status = "Finished"
             result = request("/api/v1/transfers/downloads/batches/"+batch)
             assert result["transfers"][0]["state"] == "Completed, Succeeded", result
-            print(f"Actual Nicotine+ {__version__}: HTTP main-thread dispatch, search tokens, binary result parsing, download enqueue and completion passed (Soulseek network sends disabled).")
+            transfer.status,transfer.current_byte_offset = "User logged off",2
+            (Path(transfer.folder_path)/"01 Song.flac").unlink()
+            result = request("/api/v1/transfers/downloads/batches/"+batch)
+            assert result["peerOffline"] and result["transfers"][0]["bytesTransferred"] == 2
+            config.sections["transfers"]["incompletedir"] = str(root/"incomplete")
+            (root/"incomplete").mkdir()
+            partial = Path(core.downloads.get_incomplete_download_file_path("test-peer",file["filename"]))
+            partial.write_bytes(b"te")
+            request("/api/v1/transfers/downloads/batches/"+batch+"/cancel",{"cleanupIncomplete":True})
+            assert transfer.status == "Paused" and not partial.exists()
+            request("/api/v1/transfers/downloads/batches/"+batch+"/clear",{})
+            assert "test-peer"+file["filename"] not in core.downloads.transfers
+            print(f"Actual Nicotine+ {__version__}: main-thread HTTP, search parsing, enqueue/completion, offline/progress status, scoped abort/clear and partial cleanup passed (Soulseek network sends disabled).")
             if args.arr_scripts:
                 verify_arr(args.arr_scripts, plugin, core, events, base, FileSearchResponse)
         finally:

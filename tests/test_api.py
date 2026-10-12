@@ -150,7 +150,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertTrue(state["server"]["isConnected"])
         self.assertIn("download-batches", state["capabilities"])
-        self.assertEqual(self.request("/api/v1/application/version"), (200, "0.1.2"))
+        self.assertEqual(self.request("/api/v1/application/version"), (200, "0.1.3"))
 
     def test_search_captures_token_when_core_returns_none(self):
         ident = self.search()
@@ -193,6 +193,49 @@ class ApiTests(unittest.TestCase):
         data["files"][0]["size"] = 999
         self.assertEqual(self.request("/api/v1/transfers/downloads/batches", data)[0], 400)
         self.assertFalse(self.core.enqueued)
+
+    def test_offline_batch_reports_status_and_progress(self):
+        ident,data = self.batch()
+        self.request("/api/v1/transfers/downloads/batches",data)
+        transfer = self.core.downloads.transfers["peer"+data["files"][0]["filename"]]
+        transfer.status,transfer.current_byte_offset = "User logged off",2
+        result=self.request("/api/v1/transfers/downloads/batches/"+ident)[1]
+        self.assertTrue(result["peerOffline"])
+        self.assertEqual(result["transfers"][0]["bytesTransferred"],2)
+        transfer.status="Transferring"
+        self.assertFalse(self.request("/api/v1/transfers/downloads/batches/"+ident)[1]["peerOffline"])
+
+    def test_cancel_is_scoped_and_closes_owned_partial_before_removal(self):
+        ident,data=self.batch()
+        self.request("/api/v1/transfers/downloads/batches",data)
+        transfer=self.core.downloads.transfers["peer"+data["files"][0]["filename"]]
+        transfer.status="Transferring"
+        root=self.root/"incomplete"
+        root.mkdir()
+        partial=root/"owned-partial"
+        partial.write_bytes(b"te")
+        personal=root/"personal-partial"
+        personal.write_bytes(b"personal")
+        self.core.downloads.get_incomplete_download_folder=lambda:str(root)
+        self.core.downloads.get_incomplete_download_file_path=lambda *args:str(partial)
+        def abort(rows):
+            self.assertEqual(rows,[transfer])
+            self.assertTrue(partial.exists())
+            transfer.status="Paused"
+        self.core.downloads.abort_downloads=abort
+        path="/api/v1/transfers/downloads/batches/"+ident+"/cancel"
+        self.assertEqual(self.request(path,{"cleanupIncomplete":True})[0],200)
+        self.assertFalse(partial.exists())
+        self.assertTrue(personal.exists())
+
+    def test_cancel_refuses_foreign_download_before_mutation(self):
+        ident,data=self.batch()
+        self.request("/api/v1/transfers/downloads/batches",data)
+        transfer=self.core.downloads.transfers["peer"+data["files"][0]["filename"]]
+        transfer.folder_path=str(self.root/"personal")
+        self.core.downloads.abort_downloads=lambda rows:self.fail("foreign transfer cancelled")
+        path="/api/v1/transfers/downloads/batches/"+ident+"/cancel"
+        self.assertEqual(self.request(path,{})[0],409)
 
     def test_clear_batch_refuses_active_and_conflicting_transfers(self):
         ident,data = self.batch()

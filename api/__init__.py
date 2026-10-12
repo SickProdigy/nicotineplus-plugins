@@ -17,7 +17,7 @@ from pynicotine import __version__ as NICOTINE_VERSION
 from pynicotine.events import events
 from pynicotine.pluginsystem import BasePlugin
 
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 MAX_BODY = 65536
 
 
@@ -256,7 +256,7 @@ class Plugin(BasePlugin):
         if method == "GET" and path == "/api/v1/application":
             return 200, {"client": "nicotine", "nicotineVersion": NICOTINE_VERSION,
                          "server": {"isConnected": self.connected()},
-                         "capabilities": ["search", "download-batches", "batch-destination", "batch-clear"]}
+                         "capabilities": ["search", "download-batches", "batch-destination", "batch-clear", "batch-cancel", "batch-offline"]}
         if method == "POST" and path == "/api/v1/searches":
             return self.start_search(data)
         if method == "GET" and path.startswith("/api/v1/searches/"):
@@ -264,6 +264,9 @@ class Plugin(BasePlugin):
             return 200, self.read("searches", ident)
         if method == "POST" and path == "/api/v1/transfers/downloads/batches":
             return self.start_batch(data)
+        if method == "POST" and path.startswith("/api/v1/transfers/downloads/batches/") and path.endswith("/cancel"):
+            ident = identifier(path.removeprefix("/api/v1/transfers/downloads/batches/").removesuffix("/cancel"))
+            return 200, self.cancel_batch(ident, cleanup_incomplete=data.get("cleanupIncomplete") is True)
         if method == "POST" and path.startswith("/api/v1/transfers/downloads/batches/") and path.endswith("/clear"):
             ident = identifier(path.removeprefix("/api/v1/transfers/downloads/batches/").removesuffix("/clear"))
             return 200, self.clear_batch(ident)
@@ -397,6 +400,44 @@ class Plugin(BasePlugin):
             self.store("batches", ident, value)
         return 201, {"batch": self.batch_status(ident)}
 
+    def cancel_batch(self, ident, cleanup_incomplete=False):
+        """Cancel only owned transfers, including active ones, without deleting files."""
+        value = self.read("batches", ident)
+        if value.get("cleared"):
+            return {"id":ident,"cancelled":True}
+        folder = destination(self.root,value["destination"])
+        owned = []
+        for file in value["transfers"]:
+            transfer = self.core.downloads.transfers.get(value["username"]+file["filename"])
+            if transfer is None:
+                continue
+            if Path(transfer.folder_path).resolve() != folder or transfer.size != file["size"]:
+                raise ApiFailure(409,"Transfer belongs to another download")
+            owned.append(transfer)
+        partials = []
+        if cleanup_incomplete and owned:
+            root = Path(self.core.downloads.get_incomplete_download_folder())
+            for file in value["transfers"]:
+                transfer = self.core.downloads.transfers.get(value["username"]+file["filename"])
+                if transfer is None or transfer.status == "Finished":
+                    continue
+                path = Path(self.core.downloads.get_incomplete_download_file_path(value["username"],file["filename"]))
+                if root.is_symlink() or path.is_symlink() or path.parent.resolve() != root.resolve():
+                    raise ApiFailure(409,"Invalid owned incomplete path")
+                if path.exists():
+                    info = path.stat()
+                    if not path.is_file() or info.st_nlink != 1 or info.st_size > file["size"]:
+                        raise ApiFailure(409,"Incomplete file changed or shared")
+                    partials.append(path)
+        if owned:
+            self.core.downloads.abort_downloads(owned)
+        # Core abort closes active file handles before their owned partials go.
+        for path in partials:
+            path.unlink(missing_ok=True)
+        value["cancelled"] = True
+        self.store("batches",ident,value)
+        return {"id":ident,"cancelled":True}
+
     def clear_batch(self, ident):
         """Clear terminal rows for this batch only; never delete files."""
         value = self.read("batches", ident)
@@ -431,18 +472,22 @@ class Plugin(BasePlugin):
             if file["state"] == "Completed, Rejected":
                 continue
             transfer = self.core.downloads.transfers.get(value["username"]+file["filename"])
+            file["status"] = transfer.status if transfer is not None else "Missing"
+            file["bytesTransferred"] = max(0,int(getattr(transfer,"current_byte_offset",0) or 0)) if transfer is not None else 0
             path = folder / PureWindowsPath(file["filename"]).name
             if path.is_file() and path.resolve().is_relative_to(folder) and path.stat().st_size == file["size"] and (transfer is None or transfer.status == "Finished"):
                 file["state"] = "Completed, Succeeded"
             elif transfer is None:
                 # Never resubmit uncertain calls or manually cleared transfers.
                 file["state"] = "Completed, Aborted"
-            elif transfer.status in ("Cancelled", "Filtered", "Download folder error", "Local file error"):
+            elif transfer.status in ("Cancelled", "Filtered", "Download folder error", "Local file error") or value.get("cancelled") and transfer.status == "Paused":
                 file["state"] = "Completed, Errored"
             elif transfer.status == "Finished":
                 file["state"] = "Completed, Errored"
             else:
                 file["state"] = "Queued" if transfer.status != "Transferring" else "InProgress"
+        unfinished = [f for f in value["transfers"] if not f["state"].startswith("Completed")]
+        value["peerOffline"] = bool(unfinished) and all(f.get("status") == "User logged off" for f in unfinished)
         self.store("batches", ident, value)
         return value
 

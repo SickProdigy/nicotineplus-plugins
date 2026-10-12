@@ -153,3 +153,23 @@ active transfers and transfers belonging to another destination return HTTP
 The endpoint never deletes files or cancels active downloads. Arr-scripts uses
 it before deleting owned completed/failed files and trying another candidate.
 Update the API plugin files and disable/re-enable the plugin to activate it.
+
+
+## Offline status and cancellation (API 0.1.3+)
+
+Batch status includes `peerOffline` and each transfer's Nicotine `status` and
+`bytesTransferred`. Offline is true only when all unfinished transfers report
+`User logged off`, so an online queue or slow transfer is not called offline.
+Nicotine itself automatically retries when the peer returns; clients do not
+need to pause or resubmit the batch.
+
+`POST /api/v1/transfers/downloads/batches/<UUID>/cancel` aborts only that batch's
+owned transfers, leaving finished rows intact. Every existing transfer must
+match its recorded destination and size before any abort occurs. Repeating the
+request is safe. Use the separate `/clear` operation afterward to clear rows.
+
+An optional JSON body `{"cleanupIncomplete": true}` also removes the cancelled
+batch's validated partial files after Nicotine closes their handles. Files must
+be within Nicotine's incomplete root, unlinked to other files, and no larger
+than their expected size. The endpoint never deletes completed files or personal
+transfers. Arr-scripts separately removes its owned completed leftovers.
