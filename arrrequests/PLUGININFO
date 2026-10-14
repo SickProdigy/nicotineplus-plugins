@@ -1,0 +1,4 @@
+Name = "Arr Requests"
+Version = "0.1.0"
+Authors = ["SickProdigy"]
+Description = "Approved-user request lookups for Sonarr, Radarr, and Lidarr."

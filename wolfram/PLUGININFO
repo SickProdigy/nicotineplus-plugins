@@ -1,0 +1,4 @@
+Name = "Wolfram"
+Version = "0.1.0"
+Authors = ["SickProdigy"]
+Description = "Query Wolfram|Alpha for compact text answers from Nicotine+ chat."

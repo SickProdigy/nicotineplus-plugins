@@ -1,0 +1,6 @@
+# Keep text files consistent across Windows and Linux workspaces.
+* text=auto
+
+*.py text eol=lf
+*.md text eol=lf
+**/PLUGININFO text eol=lf

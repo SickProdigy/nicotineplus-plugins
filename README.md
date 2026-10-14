@@ -25,6 +25,58 @@ A plugin is a Python module that extends the functionality of the main applicati
 
 ## Available Plugins
 
+### [Book Search](booksearch)
+
+Search lawful ebook and audiobook catalogs from room or private chat without
+blocking Nicotine+'s UI. Remote `!book` requests are opt-in, room-filterable,
+and rate-limited. The initial provider is Open Library, with a provider
+interface for adding other authorized catalogs later.
+
+### [Local AI Chat](localai)
+
+Connect room or private chat to a local Ollama or llama.cpp server without
+blocking Nicotine+'s UI. Owner `/ai` prompts work immediately after server
+configuration; remote `!ai` prompts remain opt-in, room-filterable,
+rate-limited, concurrency-limited, and bounded for chat-safe replies.
+
+### [Beets Post-Download](beetsbridge)
+
+Queue completed music folders for a configured, non-interactive beets import.
+Automatic imports are disabled by default and guarded by an allowed download
+root, file-type filtering, a settle timer, serialized execution, explicit
+copy/move/in-place modes, and bounded subprocess timeouts.
+
+### [Auto Spam Ignore](autospamignore)
+
+Apply configurable rolling message-rate, phrase, and observed-country rules in
+joined rooms, with local room and desktop notifications. Enforcement is disabled
+by default; matching users can optionally be added to Nicotine+'s persistent
+ignore list. Room scopes, trusted-user exemptions, status, and counter-reset
+commands are built in.
+
+### [Arr Requests](arrrequests)
+
+Approved-user, read-only lookups for Sonarr, Radarr, and Lidarr from room or
+private chat. The staged foundation verifies connections and searches catalogs,
+but cannot add, monitor, search for releases, or download titles. Remote access
+is disabled by default; API keys stay in plugin settings and results requested
+in rooms are returned privately.
+
+### [Wolfram](wolfram)
+
+Query Wolfram|Alpha for compact plaintext answers and step-by-step result pods
+from Nicotine+ chat. Remote use is disabled by default and restricted to
+approved usernames, optional rooms, cooldowns, and concurrency limits. AppIDs
+are kept out of chat, source links, and logs; image mode is intentionally
+omitted because Soulseek chat has no safe attachment equivalent.
+
+### [Room Announcer](announcer)
+
+Preview or send a message to explicitly configured, currently joined rooms. Named
+room groups, staggered delivery, duplicate cooldowns, cancellation, and local-only
+status output keep announcements controlled. Sending is disabled by default, and
+the plugin has no remote trigger, auto-join behavior, or recurring schedule.
+
 ### [Soulseek HTTP API](api/README.md)
 
 Authenticated searches and download batches through your existing Nicotine+ session.

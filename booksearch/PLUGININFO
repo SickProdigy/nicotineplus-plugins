@@ -1,0 +1,4 @@
+Name = "Book Search"
+Version = "0.1.0"
+Authors = ["SickProdigy"]
+Description = "Search lawful ebook and audiobook catalogs from Nicotine+ chat."

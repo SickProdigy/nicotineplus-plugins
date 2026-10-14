@@ -1,0 +1,4 @@
+Name = "Local AI Chat"
+Version = "0.1.0"
+Authors = ["SickProdigy"]
+Description = "Connect Nicotine+ chat to a local Ollama or llama.cpp server."

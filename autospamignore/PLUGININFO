@@ -1,0 +1,4 @@
+Name = "Auto Spam Ignore"
+Version = "0.1.0"
+Authors = ["SickProdigy"]
+Description = "Ignore users who exceed a configurable room-message rate."

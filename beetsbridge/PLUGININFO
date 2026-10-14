@@ -1,0 +1,4 @@
+Name = "Beets Post-Download"
+Version = "0.1.0"
+Authors = ["SickProdigy"]
+Description = "Queue completed music folders for a configured beets import."

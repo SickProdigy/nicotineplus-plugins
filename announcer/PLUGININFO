@@ -1,0 +1,4 @@
+Name = "Room Announcer"
+Version = "0.1.0"
+Authors = ["SickProdigy"]
+Description = "Preview and send rate-limited announcements to configured room groups."

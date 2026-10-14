@@ -1,4 +1,4 @@
 Name = "Auto Buddy"
 Version = "1.0"
-Authors = ["Prodigical"]
+Authors = ["SickProdigy"]
 Description = "Automatically adds users to your buddy list when they post the trigger phrase in a target room."
