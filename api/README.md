@@ -147,8 +147,9 @@ archiving as a large library grows.
 `POST /api/v1/transfers/downloads/batches/<UUID>/clear` clears only the
 terminal Nicotine download rows owned by that batch. It checks every row's
 peer/file identity, size, and destination before changing anything. Queued or
-active transfers and transfers belonging to another destination return HTTP
-409 without clearing any rows. Repeating a successful request is safe.
+active owned transfers return HTTP 409. If Nicotine has reused the peer/file
+key for a newer download in another destination, the old batch detaches from
+that foreign row without changing it. Repeating a successful request is safe.
 
 The endpoint never deletes files or cancels active downloads. Arr-scripts uses
 it before deleting owned completed/failed files and trying another candidate.
@@ -164,9 +165,10 @@ Nicotine itself automatically retries when the peer returns; clients do not
 need to pause or resubmit the batch.
 
 `POST /api/v1/transfers/downloads/batches/<UUID>/cancel` aborts only that batch's
-owned transfers, leaving finished rows intact. Every existing transfer must
-match its recorded destination and size before any abort occurs. Repeating the
-request is safe. Use the separate `/clear` operation afterward to clear rows.
+owned transfers, leaving finished rows intact. A transfer in another destination
+belongs to another batch and is left unchanged; an owned transfer with changed
+metadata returns HTTP 409. Repeating the request is safe. Use the separate
+`/clear` operation afterward to clear rows.
 
 An optional JSON body `{"cleanupIncomplete": true}` also removes the cancelled
 batch's validated partial files after Nicotine closes their handles. Files must

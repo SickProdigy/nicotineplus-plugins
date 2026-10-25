@@ -150,7 +150,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertTrue(state["server"]["isConnected"])
         self.assertIn("download-batches", state["capabilities"])
-        self.assertEqual(self.request("/api/v1/application/version"), (200, "0.1.3"))
+        self.assertEqual(self.request("/api/v1/application/version"), (200, "0.1.4"))
 
     def test_search_captures_token_when_core_returns_none(self):
         ident = self.search()
@@ -228,16 +228,17 @@ class ApiTests(unittest.TestCase):
         self.assertFalse(partial.exists())
         self.assertTrue(personal.exists())
 
-    def test_cancel_refuses_foreign_download_before_mutation(self):
+    def test_cancel_detaches_foreign_download_without_mutation(self):
         ident,data=self.batch()
         self.request("/api/v1/transfers/downloads/batches",data)
         transfer=self.core.downloads.transfers["peer"+data["files"][0]["filename"]]
         transfer.folder_path=str(self.root/"personal")
         self.core.downloads.abort_downloads=lambda rows:self.fail("foreign transfer cancelled")
         path="/api/v1/transfers/downloads/batches/"+ident+"/cancel"
-        self.assertEqual(self.request(path,{})[0],409)
+        self.assertEqual(self.request(path,{})[0],200)
+        self.assertIs(self.core.downloads.transfers["peer"+data["files"][0]["filename"]],transfer)
 
-    def test_clear_batch_refuses_active_and_conflicting_transfers(self):
+    def test_clear_batch_refuses_active_but_detaches_foreign_transfer(self):
         ident,data = self.batch()
         self.request("/api/v1/transfers/downloads/batches",data)
         key = "peer"+data["files"][0]["filename"]
@@ -246,8 +247,17 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.request("/api/v1/transfers/downloads/batches/"+ident+"/clear",{})[0],409)
         transfer.status = "Finished"
         transfer.folder_path = str(self.root/"personal")
-        self.assertEqual(self.request("/api/v1/transfers/downloads/batches/"+ident+"/clear",{})[0],409)
+        self.assertEqual(self.request("/api/v1/transfers/downloads/batches/"+ident+"/clear",{})[0],200)
         self.assertIs(self.core.downloads.transfers[key],transfer)
+
+    def test_clear_batch_refuses_changed_owned_transfer(self):
+        ident,data = self.batch()
+        self.request("/api/v1/transfers/downloads/batches",data)
+        transfer = self.core.downloads.transfers["peer"+data["files"][0]["filename"]]
+        transfer.status = "Finished"
+        transfer.size += 1
+        self.core.downloads.clear_downloads = lambda rows: self.fail("must not clear")
+        self.assertEqual(self.request("/api/v1/transfers/downloads/batches/"+ident+"/clear",{})[0],409)
 
     def test_clear_batch_is_scoped_idempotent_and_retains_files(self):
         ident,data = self.batch()

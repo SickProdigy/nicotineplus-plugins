@@ -17,7 +17,7 @@ from pynicotine import __version__ as NICOTINE_VERSION
 from pynicotine.events import events
 from pynicotine.pluginsystem import BasePlugin
 
-VERSION = "0.1.3"
+VERSION = "0.1.4"
 MAX_BODY = 65536
 
 
@@ -411,15 +411,19 @@ class Plugin(BasePlugin):
             transfer = self.core.downloads.transfers.get(value["username"]+file["filename"])
             if transfer is None:
                 continue
-            if Path(transfer.folder_path).resolve() != folder or transfer.size != file["size"]:
-                raise ApiFailure(409,"Transfer belongs to another download")
-            owned.append(transfer)
+            if Path(transfer.folder_path).resolve() != folder:
+                # Nicotine keys transfers by peer and remote filename. A newer
+                # batch may therefore replace this row with one for a different
+                # destination. It is foreign now: leave it completely alone.
+                continue
+            if transfer.size != file["size"]:
+                raise ApiFailure(409,"Owned transfer metadata changed")
+            owned.append((file, transfer))
         partials = []
         if cleanup_incomplete and owned:
             root = Path(self.core.downloads.get_incomplete_download_folder())
-            for file in value["transfers"]:
-                transfer = self.core.downloads.transfers.get(value["username"]+file["filename"])
-                if transfer is None or transfer.status == "Finished":
+            for file, transfer in owned:
+                if transfer.status == "Finished":
                     continue
                 path = Path(self.core.downloads.get_incomplete_download_file_path(value["username"],file["filename"]))
                 if root.is_symlink() or path.is_symlink() or path.parent.resolve() != root.resolve():
@@ -430,7 +434,7 @@ class Plugin(BasePlugin):
                         raise ApiFailure(409,"Incomplete file changed or shared")
                     partials.append(path)
         if owned:
-            self.core.downloads.abort_downloads(owned)
+            self.core.downloads.abort_downloads([transfer for _, transfer in owned])
         # Core abort closes active file handles before their owned partials go.
         for path in partials:
             path.unlink(missing_ok=True)
@@ -450,8 +454,12 @@ class Plugin(BasePlugin):
             transfer = self.core.downloads.transfers.get(value["username"]+file["filename"])
             if transfer is None:
                 continue
-            if Path(transfer.folder_path).resolve() != folder or transfer.size != file["size"]:
-                raise ApiFailure(409, "Transfer belongs to another download")
+            if Path(transfer.folder_path).resolve() != folder:
+                # The peer/filename key has been reused by another batch. The
+                # old batch no longer owns that row and must not block on it.
+                continue
+            if transfer.size != file["size"]:
+                raise ApiFailure(409, "Owned transfer metadata changed")
             if transfer.status not in terminal:
                 raise ApiFailure(409, "Batch still has active or queued transfers")
             owned.append(transfer)
